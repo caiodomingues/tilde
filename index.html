@@ -84,6 +84,19 @@
       {
         name: 'Shortner',
         url: 'https://shortn.blue',
+        onSubmit: async (query) => {
+          const url = query.split(' ')[1];
+          const res = await fetch('https://shortn.bluepaper.io/links', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+          });
+
+          if (res.ok) {
+            const { hash } = await res.json();
+            navigator.clipboard.writeText(`https://shortn.blue/${hash}`);
+          }
+        },
       },
     ],
     [
@@ -431,28 +444,37 @@
       }
 
       if (COMMANDS.has(query)) {
-        const { command, key, url } = COMMANDS.get(query);
-        return command ? Search.#parseQuery(command) : { key, query, url };
+        const { command, key, url, onSubmit } = COMMANDS.get(query);
+        return command
+          ? Search.#parseQuery(command)
+          : { key, query, url, onSubmit };
       }
 
       let splitBy = CONFIG.commandSearchDelimiter;
       const [searchKey, rawSearch] = query.split(new RegExp(`${splitBy}(.*)`));
 
       if (COMMANDS.has(searchKey)) {
-        const { searchTemplate, url: base } = COMMANDS.get(searchKey);
+        const { searchTemplate, url: base, onSubmit } = COMMANDS.get(searchKey);
         const search = rawSearch.trim();
         const url = Search.#formatSearchUrl(base, searchTemplate, search);
-        return { key: searchKey, query, search, splitBy, url };
+        return { key: searchKey, query, search, splitBy, url, onSubmit };
       }
 
       splitBy = CONFIG.commandPathDelimiter;
       const [pathKey, path] = query.split(new RegExp(`${splitBy}(.*)`));
 
       if (COMMANDS.has(pathKey)) {
-        const { url: base } = COMMANDS.get(pathKey);
+        const { url: base, onSubmit } = COMMANDS.get(pathKey);
         const [baseUrl] = Search.#splitUrl(base);
         const url = `${baseUrl}/${path}`;
-        return { key: pathKey, path, query, splitBy, url };
+        return {
+          key: pathKey,
+          path,
+          query,
+          splitBy,
+          url,
+          onSubmit,
+        };
       }
 
       const [baseUrl, rest] = Search.#splitUrl(CONFIG.defaultSearchTemplate);
@@ -476,9 +498,13 @@
     }
 
     #execute(query) {
-      const { url } = Search.#parseQuery(query);
-      const target = CONFIG.openLinksInNewTab ? '_blank' : '_self';
-      window.open(url, target, 'noopener noreferrer');
+      const { url, onSubmit, search, key } = Search.#parseQuery(query);
+      if (key && search && onSubmit) {
+        onSubmit(query);
+      } else {
+        const target = CONFIG.openLinksInNewTab ? '_blank' : '_self';
+        window.open(url, target, 'noopener noreferrer');
+      }
       this.#close();
     }
 
@@ -512,6 +538,8 @@
       const url = new URL(oq.url);
       if (!oq.search) {
         this.#description.innerText = `Press enter to go to ${url.host}`;
+      } else if (oq.onSubmit) {
+        this.#description.innerText = `Press enter to trigger the ${url.host} action with value: "${oq.search}"`;
       } else {
         this.#description.innerText = `Press enter to search "${oq.search}" at ${url.host}`;
       }
