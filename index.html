@@ -3,6 +3,7 @@
 <meta name="color-scheme" content="dark light" />
 <meta name="robots" content="noindex" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="favicon" href="/favicon.ico" />
 <title>~</title>
 
 <style>
@@ -54,7 +55,10 @@
       'g',
       {
         name: 'GitHub',
-        suggestions: ['g/caiodomingues', 'g/bluepaper-io'],
+        suggestions: [
+          { label: 'caiodomingues', url: 'g/caiodomingues' },
+          { label: 'BluePaper', url: 'g/bluepaper-io' },
+        ],
         searchTemplate: '/search?q={}',
         url: 'https://github.com',
       },
@@ -64,7 +68,11 @@
       'i',
       {
         name: 'Instagram',
-        suggestions: ['i/caiodev_', 'i/bluepaper.io'],
+        suggestions: [
+          { label: 'Direct', url: 'i/direct/inbox/' },
+          { label: 'caiodev_', url: 'i/caiodev_' },
+          { label: 'BluePaper', url: 'i/bluepaper.io' },
+        ],
         searchTemplate: '/{}',
         url: 'https://instagram.com',
       },
@@ -76,7 +84,11 @@
       'm',
       {
         name: 'Gmail',
-        suggestions: ['m/mail/u/0', 'm/mail/u/1', 'm/mail/u/2'],
+        suggestions: [
+          { label: 'Descartável', url: 'm/mail/u/0' },
+          { label: 'Primário', url: 'm/mail/u/1' },
+          { label: 'Profissional', url: 'm/mail/u/2' },
+        ],
         searchTemplate: '/{}/#inbox',
         url: 'https://mail.google.com/mail/u',
       },
@@ -90,9 +102,9 @@
       {
         name: 'Reddit',
         suggestions: [
-          'r/r/selfhosted',
-          'r/r/dataisbeautiful',
-          'r/r/mechanicalkeyboards',
+          { label: 'selfhosted', url: 'r/r/selfhosted' },
+          { label: 'dataisbeautiful', url: 'r/r/dataisbeautiful' },
+          { label: 'mechanicalkeyboards', url: 'r/r/mechanicalkeyboards' },
         ],
         url: 'https://reddit.com',
       },
@@ -132,7 +144,10 @@
       'x',
       {
         name: 'X',
-        suggestions: ['x/bluepaperio', 'x/caio_dss'],
+        suggestions: [
+          { label: 'caio_dss', url: 'x/caio_dss' },
+          { label: 'BluePaper', url: 'x/bluepaperio' },
+        ],
         searchTemplate: '/search?q={}&src=typed_query',
         url: 'https://x.com',
       },
@@ -151,7 +166,12 @@
       {
         name: 'localhost',
         searchTemplate: ':{}',
-        suggestions: ['0 8081', '0 8080', '0 3333', '0 3001'],
+        suggestions: [
+          { label: ':8081', url: '0 8081' },
+          { label: ':8080', url: '0 8080' },
+          { label: ':3333', url: '0 3333' },
+          { label: ':3001', url: '0 3001' },
+        ],
         url: 'http://localhost:3000',
       },
     ],
@@ -433,19 +453,18 @@
     static #fetchSuggestions(search) {
       return new Promise((resolve) => {
         window.autocompleteCallback = (res) => {
-          const suggestions = [];
+          const suggestions = res[1] || [];
 
-          for (const item of res) {
-            if (item.phrase === search.toLowerCase()) continue;
-            suggestions.push(item.phrase);
-          }
+          const filteredSuggestions = suggestions
+            .filter((item) => item.toLowerCase() !== search.toLowerCase())
+            .slice(0, CONFIG.suggestionLimit);
 
-          resolve(suggestions);
+          resolve(filteredSuggestions);
         };
 
         const script = document.createElement('script');
         document.querySelector('head').appendChild(script);
-        script.src = `https://www.google.com/complete/search?client=brave&q=${search}`;
+        script.src = `http://suggestqueries.google.com/complete/search?client=chrome&q=${search}&jsonp=autocompleteCallback`;
         script.onload = script.remove;
       });
     }
@@ -578,12 +597,12 @@
       let suggestions = COMMANDS.get(oq.query)?.suggestions ?? [];
 
       if (oq.search && suggestions.length < CONFIG.suggestionLimit) {
-        const res = await Search.#fetchSuggestions(oq.search);
+        const response = await Search.#fetchSuggestions(oq.search);
 
         suggestions = suggestions.concat(
-          oq.splitBy
-            ? res.map((search) => `${oq.key}${oq.splitBy}${search}`)
-            : res
+          response
+            .map((suggestion) => suggestion.trim())
+            .filter((suggestion) => !suggestions.includes(suggestion))
         );
       }
 
@@ -650,18 +669,19 @@
         ref.dataset.index = index;
         ref.dataset.suggestion = suggestion;
         const escapedQuery = Search.#escapeRegexCharacters(query);
-        const matched = suggestion.match(new RegExp(escapedQuery, 'i'));
+        if (suggestion.url) {
+          ref.dataset.suggestion = suggestion.url;
+          const matched = suggestion.url.match(new RegExp(escapedQuery, 'i'));
 
-        if (matched) {
-          const template = document.getElementById('match-template');
-          const clone = template.content.cloneNode(true);
-          const matchRef = clone.querySelector('.match');
-          const pre = suggestion.slice(0, matched.index);
-          const post = suggestion.slice(matched.index + matched[0].length);
-          matchRef.innerText = matched[0];
-          matchRef.insertAdjacentHTML('beforebegin', pre);
-          matchRef.insertAdjacentHTML('afterend', post);
-          ref.append(clone);
+          if (matched) {
+            const template = document.getElementById('match-template');
+            const clone = template.content.cloneNode(true);
+            const matchRef = clone.querySelector('.match');
+            matchRef.innerText = suggestion.label;
+            ref.append(clone);
+          } else {
+            ref.innerText = suggestion.url;
+          }
         } else {
           ref.innerText = suggestion;
         }
