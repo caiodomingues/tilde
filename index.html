@@ -464,7 +464,7 @@
 
         const script = document.createElement('script');
         document.querySelector('head').appendChild(script);
-        script.src = `http://suggestqueries.google.com/complete/search?client=chrome&q=${search}&jsonp=autocompleteCallback`;
+        script.src = `https://suggestqueries.google.com/complete/search?client=chrome&q=${search}&jsonp=autocompleteCallback`;
         script.onload = script.remove;
       });
     }
